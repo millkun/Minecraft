@@ -1,0 +1,120 @@
+const mineflayer = require("mineflayer");
+const bot = mineflayer.createBot({
+	host: 'PLAY.TESLACRAFT.ORG',
+	port: 25565,
+	username: 'Morkovka935' // ������ ������ ������� � ������� ����
+});
+
+let isGameActive = false;
+let currentPlayer = null;
+const developerNick = '_Morkovka_';
+
+// ������� ��� ��������� ���������� ����� (2-11)
+function getRandomNumber() {
+  const values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]; // 10 ����� ������� ���� ���������
+  return values[Math.floor(Math.random() * values.length)];
+}
+
+// ������� ��� �������� �����
+function calculateScore(hand) {
+  let score = 0;
+  let aceCount = 0;
+  hand.forEach(value => {
+    if (value === 11) {
+      aceCount++;
+      score += 11;
+    } else {
+      score += value;
+    }
+  });
+  while (score > 21 && aceCount > 0) {
+    score -= 10;
+    aceCount--;
+  }
+  return score;
+}
+
+// ����� ���� �� �������
+bot.once('spawn', function () {
+	console.log('Bot has spawned');
+	bot.whisper(_Morkovka_, '\u042f\u0020\u0437\u0430\u0448\u0451\u043b\u0020\u043d\u0430\u0020\u0441\u0435\u0440\u0432\u0435\u0440.');
+});
+
+// ��������� ����
+bot.on('chat', function (username, message) {
+	
+	if (username === developerNick) {
+		console.log('Received chat message from ${username}: ${message}');
+		if (message.toLowerCase() === "\u043e\u0432\u043e\u0449\u0020\u043a\u0432") { // Ovosh survival
+			bot.chat("\u0421\u043b\u0443\u0448\u0430\u044e\u0441\u044c\u002c\u0020\u043c\u043e\u0439\u0020\u0433\u043e\u0441\u043f\u043e\u0434\u0438\u043d"); // Yes, master
+			bot.chat("/Survival");
+		} else if (message.toLowerCase() === "\u043e\u0432\u043e\u0449\u0020\u043a\u043e\u0020\u043c\u043d\u0435") { // Ovosh ko mne
+			bot.chat("/tpaccept");
+		} else if (message.toLowerCase() === "\u043e\u0432\u043e\u0449\u0020\u0431\u043b\u0435\u043a\u0434\u0436\u0435\u043a") {
+      bot.chat("\u0418\u0433\u0440\u0430\u0020\u0431\u043b\u0435\u043a\u0434\u0436\u0435\u043a\u0020\u0437\u0430\u043f\u0443\u0449\u0435\u043d\u0430");
+      if (isGameActive) {
+        bot.chat(`${username}, \u0438\u0437\u0432\u0438\u043d\u0438, \u043d\u043e\u0020\u0443\u0436\u0435\u0020\u0438\u0434\u0435\u0442\u0020\u0438\u0433\u0440\u0430\u0020\u0441 ${currentPlayer}. \u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430\u002c\u0020\u043f\u043e\u0434\u043e\u0436\u0434\u0438.`);
+      } else {
+        isGameActive = true;
+        currentPlayer = username;
+        // bot.chat(`${username}, let`s play blackjak!`);
+  
+        let playerScore = getRandomNumber() + getRandomNumber();
+        let dealerScore = getRandomNumber() + getRandomNumber();
+  
+        bot.chat(`\u0422\u0432\u043e\u0439\u0020\u0441\u0447\u0435\u0442: ${playerScore}`); // Your score
+        bot.chat(`\u0421\u0447\u0435\u0442\u0020\u0434\u0438\u043b\u0435\u0440\u0430: ${dealerScore}`); // Diler score
+  
+        // Game
+        function playerTurn() {
+          bot.chat(`${username}, \u0431\u0435\u0440\u0451\u0448\u044c\u0020\u0435\u0449\u0451\u0020\u0438\u043b\u0438\u0020\u0434\u0435\u0440\u0436\u0438\u0448\u044c? (\u0431\u0435\u0440\u0443/\u0434\u0435\u0440\u0436\u0443)`); // Do u want to take cards or not?
+          bot.once('chat', (username, message) => {
+            if (message.toLowerCase() === '\u0431\u0435\u0440\u0443') { // Take
+              playerScore += getRandomNumber();
+              bot.chat(`\u0422\u0432\u043e\u0439\u0020\u0441\u0447\u0451\u0442: ${playerScore}`); // Your score
+              if (playerScore > 21) {
+                bot.chat(`\u0422\u044b\u0020\u043f\u0440\u043e\u0438\u0433\u0440\u0430\u043b\u0021\u0020\u0422\u0432\u043e\u0439\u0020\u0441\u0447\u0451\u0442: ${playerScore}`); // U lose
+                endGame();
+              } else {
+                playerTurn();
+              }
+            } else if (message.toLowerCase() === '\u0434\u0435\u0440\u0436\u0443') { // Stand
+              dealerTurn();
+            }
+          });
+        }
+  
+        function dealerTurn() {
+          while (dealerScore < 17) {
+            dealerScore += getRandomNumber();
+          }
+          bot.chat(`\u0421\u0447\u0435\u0442\u0020\u0434\u0438\u043b\u0435\u0440\u0430: ${dealerScore}`); // Diler score
+  
+          if (dealerScore > 21 || playerScore > dealerScore) {
+            bot.chat(`\u0422\u044b\u0020\u0432\u044b\u0438\u0433\u0440\u0430\u043b\u0021\u0020\u0422\u0432\u043e\u0439\u0020\u0441\u0447\u0435\u0442: ${playerScore}, \u0441\u0447\u0435\u0442\u0020\u0434\u0438\u043b\u0435\u0440\u0430: ${dealerScore}`); // You win, your score
+          } else if (playerScore === dealerScore) {
+            bot.chat(`\u041d\u0438\u0447\u044c\u044f\u0021\u0020\u0422\u0432\u043e\u0439\u0020\u0441\u0447\u0435\u0442: ${playerScore}, \u0441\u0447\u0435\u0442\u0020\u0434\u0438\u043b\u0435\u0440\u0430: ${dealerScore}`); // It`s draw. Your score
+          } else {
+            bot.chat(`\u0422\u044b\u0020\u043f\u0440\u043e\u0438\u0433\u0440\u0430\u043b\u0021\u0020\u0422\u0432\u043e\u0439\u0020\u0441\u0447\u0435\u0442: ${playerScore}, \u0441\u0447\u0435\u0442\u0020\u0434\u0438\u043b\u0435\u0440\u0430: ${dealerScore}`); // You lose, your score
+          }
+          endGame();
+        }
+  
+        function endGame() {
+          isGameActive = false;
+          currentPlayer = null;
+        }
+  
+        playerTurn();
+      }
+		}
+	}
+});
+
+bot.on('error', (err) => {
+  console.error('Error:', err);
+});
+
+bot.on('end', () => {
+  console.log('Bot has disconnected.');
+});
