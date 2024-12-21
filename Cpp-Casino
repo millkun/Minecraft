@@ -1,0 +1,102 @@
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <vector>
+using namespace std;
+
+vector<vector<int>> arrayNum = {};
+bool correct;
+
+void createVector() {
+    srand(static_cast<unsigned int>(time(0)));
+    int m, n, k;
+    vector<int> firstRow = { 1, 1, 1 };
+    arrayNum.push_back(firstRow); // First row is absolutely winning
+
+    for (int i = 0; i < 7; i++) {
+        m = rand() % 2;
+        if (m == 0) {
+            n = 1;
+            k = 1;
+        }
+        else {
+            n = rand() % 2;
+            if (n == 0) {
+                k = 1;
+            }
+            else {
+                k = 0;
+            }
+        }
+        vector<int> newRow = { m, n, k };
+        arrayNum.push_back(newRow);
+    }
+}
+
+void showVector(int rowCount) {
+    if (rowCount == 0) {
+        cout << "# # #\n" << "# # #\n" << "# # #\n" << "# # #\n" << "# # #\n" << "# # #\n" << "# # #\n" << "# # #\n";
+    }
+    else if (rowCount == 456) {
+        for (const auto& row : arrayNum) {
+            for (int value : row) {
+                cout << value << " ";
+            }
+            cout << endl;
+        }
+    }
+    else {
+        for (int i = 0; i < rowCount; i++) {
+            for (int value : arrayNum[i]) {
+                cout << value << " ";
+            }
+            cout << endl;
+        }
+        int remains = 8 - rowCount;
+        for (int i = 0; i < remains; i++) {
+            cout << "# # #\n";
+        }
+    }
+}
+
+void checkVector(int row, int num) {
+    if (arrayNum[row][num] == 1) {
+        correct = true;
+    }
+    else {
+        correct = false;
+    }
+}
+
+int main() {
+    int rowCount = 0;
+    int choice;
+    createVector();
+    showVector(rowCount);
+
+    while (rowCount < 8) {
+        cout << "Choose which element will be opened: ";
+        cin >> choice;
+        choice--;
+        while (choice < 0 || choice > 2) {
+            cout << "Incorrect input. Repeat: ";
+            cin >> choice;
+            choice--;
+        }
+
+        checkVector(rowCount, choice);
+        if (correct) {
+            cout << "Correct! Keep going..." << endl;
+            rowCount++;
+        }
+        else {
+            cout << "You lose..." << endl;
+            showVector(456);
+            return 0;
+        }
+
+        showVector(rowCount);
+    }
+    cout << "Congratulations! You won!" << endl;
+    return 0;
+}
