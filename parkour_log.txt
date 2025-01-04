@@ -1,6 +1,6 @@
-_Morkovka_ 213 15.402 
+_Morkovka_ 236 15.42 
 XTEP 22 16.1 
-DeX_Xth 1 197.264 
+DeX_Xth 2 23.808 
 realprioritet 2 50.314 
 героинщик 88 15.712 
 _Solitude_ 33 16.511 
@@ -14,9 +14,14 @@ fahtes 21 19.254
 spongebobas228 1 286.251 
 _REFARA_ 6 19.303 
 _FleksFull_ 6 17.255 
-Treew 170 15.104 
+Treew 177 15.104 
 ArnatHack 1 82.863 
 ~E_M_I_R_Y~ 2 33.503 
 RebenokVtankE 1 148.508 
-KurapikaLS 530 14.801 
-Temka_1032 27 16.201
+KurapikaLS 534 14.801 
+Temka_1032 27 16.201 
+Dar_Play28 1 98.328 
+Melitory 1 40.091 
+prosto=ing 3 23.26 
+Clychine 1 100.539 
+BaFFinn_ 80 15.2
