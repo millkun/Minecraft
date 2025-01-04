@@ -139,9 +139,9 @@ bot.once('spawn', function () {
 
   // Устанавливаем интервал для отправки сообщения в чат каждые полчаса
   setInterval(() => {
-    bot.chat('!&e&l/&6&lw&e&la&6&lr&e&lp &6&lh&e&lu&6&lb &f&l- Интерактивное &c&lа&4&lф&c&lк&4&l-&c&lл&4&lо&c&lб&4&lб&c&lи &f&l для игроков');
+    bot.chat('!&e&l/&6&lw&e&la&6&lr&e&lp &6&lh&e&lu&6&lb &f&l- Интерактивное &c&lа&4&lф&c&lк&4&l-&c&lл&4&lо&c&lб&4&lб&c&lи&f&l: &fМини-паркур, пианино');
     telegramBot.sendMessage(chatId, 'Агитационное сообщение отправлено. #агитация');
-  }, 60 * 60 * 1000);
+  }, 45 * 60 * 1000);
 });
 
 bot.on('playerJoined', (player) => {
