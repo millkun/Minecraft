@@ -126,7 +126,7 @@ bot.once('spawn', function () {
         }, index * 1500); // Задержка в 1.5 секунды для каждого последующего сообщения
       });
       setTimeout(() => {
-        bot.chat('/holo line stats 7 &6Обновление каждые &a5 минут&6, если бот онлайн');
+        bot.chat('/holo line stats 7 &6Обновление каждые &a10 минут&6, если бот онлайн');
       }, topPlayers.length * 1500); // Задержка в 1.5 секунды после последнего сообщения из топа
     } else {
       bot.chat('Произошла непредвиденая ошибка');
@@ -143,13 +143,13 @@ bot.once('spawn', function () {
 
     if (topPlayers.length > 0) {
       topPlayers.forEach((log, index) => {
-        const message = `${index + 2} &f${index + 1}. &c&l${log.username} &f[&4&l${log.runes}&f] - &e${log.runes} &fрун`;
+        const message = `${index + 2} &f${index + 1}. &c&l${log.username} &f- &e${log.runes}&4ひ &fрун`;
         setTimeout(() => {
-          bot.chat(`/holo line stats ${message}`);
+          bot.chat(`/holo line runs ${message}`);
         }, index * 1500); // Задержка в 1.5 секунды для каждого последующего сообщения
       });
       setTimeout(() => {
-        bot.chat('/holo line stats 7 &6Обновление каждые &a5 минут&6, если бот онлайн');
+        bot.chat('/holo line runs 7 &6Обновление каждые &a10 минут&6, если бот онлайн');
       }, topPlayers.length * 1500); // Задержка в 1.5 секунды после последнего сообщения из топа
     } else {
       bot.chat('Произошла непредвиденая ошибка');
@@ -170,7 +170,7 @@ bot.once('spawn', function () {
 
   // Устанавливаем интервал для отправки сообщения в чат каждые полчаса
   setInterval(() => {
-    bot.chat('!&e&l/&6&lw&e&la&6&lr&e&lp &6&lh&e&lu&6&lb &f&l- Интерактивное &c&lа&4&lф&c&lк&4&l-&c&lл&4&lо&c&lб&4&lб&c&lи&f&l: &fМини-паркур, пианино');
+    bot.chat('!&e&l/&6&lw&e&la&6&lr&e&lp &6&lh&e&lu&6&lb &f&l- Интерактивное &c&lа&4&lф&c&lк&4&l-&c&lл&4&lо&c&lб&4&lб&c&lи');
     telegramBot.sendMessage(chatId, 'Агитационное сообщение отправлено. #агитация');
   }, 45 * 60 * 1000);
 });
@@ -241,12 +241,11 @@ bot.on('entityMoved', (entity) => {
               } else if (currentPoint === 15) {
                 speed = 4.54 / timeDiff;
                 message = `Player ${playerName} is cheating with speed hack at points 14-15. Speed: ${speed}`;
-                if (speed > 9.188) {
+                if (speed > 11.5) {
                   console.log(message);
                   telegramBot.sendMessage(chatId, `${playerName} проходит паркур с ускорением на участке ${currentPoint - 1}-${currentPoint}. Скорость: ${speed}. #скорость`);
                 }
               }
-              console.log(`Speed: ${speed}`);
             } else {
               console.log("timeDiff is zero or negative, cannot calculate speed.");
             }
@@ -262,9 +261,7 @@ bot.on('entityMoved', (entity) => {
           const endTime = new Date();
           const timeTaken = (endTime - playerProgress[playerName].startTime) / 1000;
           console.log(`${playerName} completed the parkour in ${timeTaken} seconds!`);
-          bot.chat(`/pay ${playerName} 20 Прохождение мини-паркура`);
-          bot.chat(`/pay confirm`);
-          bot.chat(`&8-░-░-░-░-░-░-░-░-░-░-░-░-░-░-░ &6&l[&e&lАфк-Лобби&6&l] &a&l${playerName} &bпрошёл мини-паркур за &e${timeTaken.toFixed(2)} &bсекунд и получил &e$&a20`);
+          bot.chat(`&8-░-░-░-░-░-░-░-░-░-░-░-░-░-░-░ &6&l[&e&lАфк-Лобби&6&l] &a&l${playerName} &bпрошёл мини-паркур за &e${timeTaken.toFixed(2)} &bсекунд и получил &eひ&a150`);
 
           let playerLog = parkourLog.find(log => log.username === playerName);
           if (!playerLog) {
@@ -284,7 +281,7 @@ bot.on('entityMoved', (entity) => {
           console.log(`Progress reset after completion for ${playerName}`);
 
           // Отправка сообщения в Telegram
-          telegramBot.sendMessage(chatId, `${playerName} прошёл паркур за ${timeTaken.toFixed(2)} секунд! #паркур`);
+          telegramBot.sendMessage(chatId, `${playerName} прошёл паркур за ${timeTaken.toFixed(2)} секунд. #паркур`);
         }
       } else if (currentPoint !== 0 && currentPoint !== 1 && distanceToStart < 1.5) {
         // Сброс прогресса, если игрок пересекает стартовую точку
@@ -353,8 +350,11 @@ bot.on('chat', (username, message) => {
         bot.chat('Телепортируюсь к Вам, мой господин');
         bot.chat('/tpa _Morkovka_');
         break;
-      case '-holo':
+      case '-holo1':
         bot.chat('/holo line stats 8 &2(c) &amillkun &2- Разработчик лобби &a_Morkovka_');
+        break;
+      case '-holo2':
+        bot.chat('/holo line runs 8 &2(c) &amillkun &2- Разработчик лобби &a_Morkovka_');
         break;
       case '-return':
         handleReturnCommand(username, commandParts);
@@ -366,41 +366,37 @@ bot.on('chat', (username, message) => {
           console.log(`${log.username}: ${log.completions} completions, best time: ${log.bestTime.toFixed(2)} seconds, runes: ${log.runes}`);
         });
         break;
-      case '-unban':
-        if (commandParts.length !== 2) {
-          bot.chat(`/m ${username} Неверный формат команды. Используйте: -unban <ник>`);
-          return;
-        }
-        const targetUsername = commandParts[1];
-        if (cheatFlags[targetUsername]) {
-          cheatFlags[targetUsername] = false;
-          bot.chat(`/m ${username} Флаг читов снят с игрока ${targetUsername}.`);
-        } else {
-          bot.chat(`/m ${username} Игрок ${targetUsername} не имеет флага читов.`);
-        }
+      case '-create':
+        bot.chat(`/holo create runs`);
+        break;
+      case '-delete':
+        bot.chat(`/holo delete runs`);
+        break;
+      case '-first':
+        bot.chat(`/holo line runs &a&lТоп игроков лобби по количеству рун:`);
         break;
       case '-bal':
         if (commandParts.length !== 2) {
-          bot.chat(`/m ${username} Неверный формат команды. Используйте: -bal <ник>`);
+          bot.chat(`&4Неверный формат команды. Используйте: -bal <ник>`);
           return;
         }
         const targetUsername = commandParts[1];
         let playerLog = parkourLog.find(log => log.username.toLowerCase() === targetUsername.toLowerCase());
         if (playerLog) {
-          bot.chat(`/m ${username} Баланс рун игрока ${playerLog.username}: ${playerLog.runes}`);
+          bot.chat(`Баланс рун игрока &c&l${playerLog.username}&f: &e${playerLog.runes}&4ひ`);
         } else {
-          bot.chat(`/m ${username} Игрок ${targetUsername} не найден.`);
+          bot.chat(`&4Игрок &c&l${targetUsername} &4не найден`);
         }
         break;
       case '-runa':
         if (commandParts.length !== 3) {
-          bot.chat(`/m ${username} Неверный формат команды. Используйте: -runa <ник> <количество>`);
+          bot.chat(`&4Неверный формат команды. Используйте: -runa <ник> <количество>`);
           return;
         }
         const runaTargetUsername = commandParts[1];
         let runaAmount = parseInt(commandParts[2], 10);
         if (isNaN(runaAmount)) {
-          bot.chat(`/m ${username} Количество должно быть числом.`);
+          bot.chat(`&4Количество рун должно быть числом`);
           return;
         }
         let runaPlayerLog = parkourLog.find(log => log.username.toLowerCase() === runaTargetUsername.toLowerCase());
@@ -409,7 +405,7 @@ bot.on('chat', (username, message) => {
           parkourLog.push(runaPlayerLog);
         }
         runaPlayerLog.runes += runaAmount;
-        bot.chat(`/m ${username} Баланс рун игрока ${runaPlayerLog.username} изменен на ${runaAmount}. Новый баланс: ${runaPlayerLog.runes}`);
+        bot.chat(`Баланс рун игрока &c&l${runaPlayerLog.username} &fизменен на &e${runaAmount}&4ひ&f. Новый баланс: &e${runaPlayerLog.runes}&4ひ`);
         saveParkourLog(parkourLog);
         break;
     }
@@ -417,7 +413,7 @@ bot.on('chat', (username, message) => {
     const command = cleanMessage.toLowerCase(); // Используем очищенное сообщение
     switch (command) {
       case '-?':
-        bot.chat(`/m ${username} Это интерактивное афк-лобби. Тут можно проходить мини-паркур и регистрироваться на ивенты. По мини-паркуру есть топ игроков. Варп - hub`);
+        bot.chat(`/m ${username} Это интерактивное афк-лобби. По мини-паркуру и по количеству внутриигровых есть топ игроков. Варп - hub`);
         break;
     }
   }
