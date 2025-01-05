@@ -1,0 +1,434 @@
+const mineflayer = require('mineflayer');
+const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+const fs = require('fs');
+const path = require('path');
+const TelegramBot = require('node-telegram-bot-api');
+
+const bot = mineflayer.createBot({
+  host: 'PLAY.TESLACRAFT.ORG',
+  port: 25565,
+  username: 'Morkovka935',
+  timeout: 240000
+});
+
+bot.loadPlugin(pathfinder);
+
+const developerNick = '_Morkovka_';
+const logFilePath = path.join(__dirname, 'parkour_log.txt');
+
+// Координаты паркура
+const parkourPoints = [
+  { x: 2110.5, y: 206.5, z: 6843.5 }, // Начало паркура
+  { x: 2103.5, y: 206.5, z: 6841.5 }, // 2
+  { x: 2097.5, y: 208.5, z: 6842.5 }, // 3
+  { x: 2094.5, y: 209.5, z: 6843.5 }, // 4
+  { x: 2092.5, y: 210.5, z: 6846.5 }, // 5
+  { x: 2091.5, y: 210.5, z: 6849.5 }, // 6
+  { x: 2092.5, y: 210.5, z: 6853.5 }, // 7
+  { x: 2096.5, y: 210.5, z: 6860.5 }, // 8
+  { x: 2102.5, y: 193.5, z: 6867.5 }, // 9
+  { x: 2109.5, y: 193.5, z: 6870.5 }, // 10
+  { x: 2116.5, y: 193.5, z: 6867.5 }, // 11
+  { x: 2115.5, y: 193.5, z: 6863.5 }, // 12
+  { x: 2116.5, y: 193.5, z: 6860.5 }, // 13
+  { x: 2117.5, y: 191.5, z: 6858.5 }, // 14
+  { x: 2118.5, y: 191.5, z: 6854.5 }, // 15
+  { x: 2117.5, y: 192.5, z: 6851.5 }, // 16
+  { x: 2112.5, y: 194.5, z: 6848.5 }, // 17
+  { x: 2110.5, y: 195.5, z: 6850.5 }, // 18
+  { x: 2104.5, y: 196.5, z: 6860.5 }, // 19
+  { x: 2104.5, y: 196.5, z: 6860.5 } // Конец паркура
+];
+
+// Структура для отслеживания прогресса игроков
+const playerProgress = {};
+
+// Игроки рядом с ботом
+const playersNearBot = new Set();
+
+// Флаги для отслеживания использования читов
+const cheatFlags = {};
+const playerLastPosition = {};
+const playerLastTime = {};
+
+// Функция для загрузки данных из лог-файла
+function loadParkourLog() {
+  if (fs.existsSync(logFilePath)) {
+    const data = fs.readFileSync(logFilePath, 'utf-8');
+    return data.split(' \n').map(line => line.trim()).filter(line => line).map(line => {
+      const [username, completions, bestTime, runes] = line.split(' ');
+      return { username, completions: parseInt(completions, 10), bestTime: parseFloat(bestTime), runes: parseInt(runes, 10) };
+    });
+  }
+  return [];
+}
+
+// Функция для сохранения данных в лог-файл
+function saveParkourLog(logData) {
+  const data = logData.map(entry => `${entry.username} ${entry.completions} ${entry.bestTime} ${entry.runes}`).join(' \n');
+  fs.writeFileSync(logFilePath, data);
+}
+
+let parkourLog = loadParkourLog();
+
+// Инициализация Telegram бота
+const telegramToken = '7800594114:AAFt78t1RgkAPrfES9sMZ5wMVO2rXqbPwZw';
+const telegramBot = new TelegramBot(telegramToken, { polling: true });
+const chatId = '945518256'; // ID чата, в который будут отправляться сообщения
+
+bot.once('spawn', function () {
+  console.log('Bot has spawned');
+  const defaultMove = new Movements(bot);
+  bot.pathfinder.setMovements(defaultMove);
+
+  function lookAtNearestPlayer() {
+    const players = bot.players;
+    let nearestPlayer = null;
+    let nearestDistance = Infinity;
+
+    for (const playerName in players) {
+      if (playerName === bot.username) continue;
+      const player = players[playerName];
+      if (player.entity && player.entity.position) {
+        const distance = bot.entity.position.distanceTo(player.entity.position);
+        if (distance < nearestDistance && distance < 10) {
+          nearestDistance = distance;
+          nearestPlayer = player;
+        }
+      }
+    }
+
+    if (nearestPlayer) {
+      const playerPosition = nearestPlayer.entity.position.offset(0, 1.62, 0);
+      bot.lookAt(playerPosition);
+    }
+  }
+
+  setInterval(lookAtNearestPlayer, 10);
+
+  setTimeout(() => {
+    bot.chat(`/Survival`);
+  }, 40000);
+
+  // Функция для формирования и отправки топа игроков по времени
+  function sendTopPlayersByTime() {
+    const updatedLog = loadParkourLog(); // Загружаем актуальные данные из лог-файла
+    const topPlayers = updatedLog
+      .filter(log => log.bestTime < Infinity) // Убираем игроков без завершений
+      .sort((a, b) => a.bestTime - b.bestTime) // Сортируем по времени
+      .slice(0, 5); // Берем только топ-5
+
+    if (topPlayers.length > 0) {
+      topPlayers.forEach((log, index) => {
+        const message = `${index + 2} &f${index + 1}. &c&l${log.username} &f[&4&l${log.completions}&f] - &e${log.bestTime.toFixed(2)} &fсекунд`;
+        setTimeout(() => {
+          bot.chat(`/holo line stats ${message}`);
+        }, index * 1500); // Задержка в 1.5 секунды для каждого последующего сообщения
+      });
+      setTimeout(() => {
+        bot.chat('/holo line stats 7 &6Обновление каждые &a5 минут&6, если бот онлайн');
+      }, topPlayers.length * 1500); // Задержка в 1.5 секунды после последнего сообщения из топа
+    } else {
+      bot.chat('Произошла непредвиденая ошибка');
+      telegramBot.sendMessage(chatId, 'Произошла непредвиденая ошибка при обновлении топа. #ошибки');
+    }
+  }
+
+  // Функция для формирования и отправки топа игроков по рунам
+  function sendTopPlayersByRunes() {
+    const updatedLog = loadParkourLog(); // Загружаем актуальные данные из лог-файла
+    const topPlayers = updatedLog
+      .sort((a, b) => b.runes - a.runes) // Сортируем по рунам
+      .slice(0, 5); // Берем только топ-5
+
+    if (topPlayers.length > 0) {
+      topPlayers.forEach((log, index) => {
+        const message = `${index + 2} &f${index + 1}. &c&l${log.username} &f[&4&l${log.runes}&f] - &e${log.runes} &fрун`;
+        setTimeout(() => {
+          bot.chat(`/holo line stats ${message}`);
+        }, index * 1500); // Задержка в 1.5 секунды для каждого последующего сообщения
+      });
+      setTimeout(() => {
+        bot.chat('/holo line stats 7 &6Обновление каждые &a5 минут&6, если бот онлайн');
+      }, topPlayers.length * 1500); // Задержка в 1.5 секунды после последнего сообщения из топа
+    } else {
+      bot.chat('Произошла непредвиденая ошибка');
+      telegramBot.sendMessage(chatId, 'Произошла непредвиденая ошибка при обновлении топа. #ошибки');
+    }
+  }
+
+  // Устанавливаем интервал для отправки топов каждые 5 минут
+  let isTimeTop = true;
+  setInterval(() => {
+    if (isTimeTop) {
+      sendTopPlayersByTime();
+    } else {
+      sendTopPlayersByRunes();
+    }
+    isTimeTop = !isTimeTop;
+  }, 5 * 60 * 1000);
+
+  // Устанавливаем интервал для отправки сообщения в чат каждые полчаса
+  setInterval(() => {
+    bot.chat('!&e&l/&6&lw&e&la&6&lr&e&lp &6&lh&e&lu&6&lb &f&l- Интерактивное &c&lа&4&lф&c&lк&4&l-&c&lл&4&lо&c&lб&4&lб&c&lи&f&l: &fМини-паркур, пианино');
+    telegramBot.sendMessage(chatId, 'Агитационное сообщение отправлено. #агитация');
+  }, 45 * 60 * 1000);
+});
+
+bot.on('playerJoined', (player) => {
+  console.log(`${player.username} joined the server.`);
+  playerProgress[player.username] = { currentPoint: 0, startTime: null };
+  cheatFlags[player.username] = false; // Инициализация флага читов
+  playerLastPosition[player.username] = null;
+  playerLastTime[player.username] = null;
+});
+
+bot.on('entityMoved', (entity) => {
+  if (entity.type === 'player' && entity.username) {
+    const playerName = entity.username;
+    const playerPos = entity.position;
+    const distanceToBot = bot.entity.position.distanceTo(playerPos);
+    let pastTime;
+
+    if (distanceToBot < 100) {
+      if (!playersNearBot.has(playerName)) {
+        playersNearBot.add(playerName);
+        telegramBot.sendMessage(chatId, `${playerName} зашёл в хаб. #онлайн`);
+      }
+    } else {
+      if (playersNearBot.has(playerName)) {
+        playersNearBot.delete(playerName);
+        telegramBot.sendMessage(chatId, `${playerName} покинул хаб. #онлайн`);
+      }
+    }
+
+    if (playerProgress[playerName]) {
+      const currentPoint = playerProgress[playerName].currentPoint;
+      const currentParkourPoint = parkourPoints[currentPoint];
+
+      const distanceToPoint = playerPos.distanceTo(currentParkourPoint);
+      const distanceToStart = playerPos.distanceTo(parkourPoints[0]);
+      if (distanceToPoint < 1.5) { // Проверка на близость к точке
+        if (currentPoint === 0 && playerProgress[playerName].startTime === null) {
+          playerProgress[playerName].startTime = new Date();
+        }
+        if (currentPoint === 5 || currentPoint === 9 || currentPoint === 14) {
+          playerLastTime[playerName] = new Date(); // Сохраняем время для игрока
+          console.log(`Past time: ${playerLastTime[playerName]}`);
+        }
+        if (currentPoint === 6 || currentPoint === 10 || currentPoint === 15) {
+          if (playerLastTime[playerName]) {
+            const timeDiff = (new Date() - playerLastTime[playerName]) / 1000;
+            console.log(`Time: ${timeDiff}`);
+            if (timeDiff > 0) { // Проверка на ноль
+              let speed;
+              let message;
+
+              if (currentPoint === 6) {
+                speed = 3.65 / timeDiff;
+                message = `Player ${playerName} is cheating with speed hack at points 5-6. Speed: ${speed}`;
+                if (speed > 7.61577) { // 6.222
+                  console.log(message);
+                  telegramBot.sendMessage(chatId, `${playerName} проходит паркур с ускорением на участке ${currentPoint - 1}-${currentPoint}. Скорость: ${speed}. #скорость`);
+                }
+              } else if (currentPoint === 10) {
+                speed = 8.25 / timeDiff;
+                message = `Player ${playerName} is cheating with speed hack at points 9-10. Speed: ${speed}`;
+                if (speed > 7.61577) { // 6.644
+                  console.log(message);
+                  telegramBot.sendMessage(chatId, `${playerName} проходит паркур с ускорением на участке ${currentPoint - 1}-${currentPoint}. Скорость: ${speed}. #скорость`);
+                }
+              } else if (currentPoint === 15) {
+                speed = 4.54 / timeDiff;
+                message = `Player ${playerName} is cheating with speed hack at points 14-15. Speed: ${speed}`;
+                if (speed > 9.188) {
+                  console.log(message);
+                  telegramBot.sendMessage(chatId, `${playerName} проходит паркур с ускорением на участке ${currentPoint - 1}-${currentPoint}. Скорость: ${speed}. #скорость`);
+                }
+              }
+              console.log(`Speed: ${speed}`);
+            } else {
+              console.log("timeDiff is zero or negative, cannot calculate speed.");
+            }
+          } else {
+            console.log("pastTime is not initialized for point ${currentPoint}");
+          }
+        }
+
+        playerProgress[playerName].currentPoint++;
+        console.log(`Player ${playerName} at point ${playerProgress[playerName].currentPoint}`);
+
+        if (playerProgress[playerName].currentPoint === parkourPoints.length - 1) {
+          const endTime = new Date();
+          const timeTaken = (endTime - playerProgress[playerName].startTime) / 1000;
+          console.log(`${playerName} completed the parkour in ${timeTaken} seconds!`);
+          bot.chat(`/pay ${playerName} 20 Прохождение мини-паркура`);
+          bot.chat(`/pay confirm`);
+          bot.chat(`&8-░-░-░-░-░-░-░-░-░-░-░-░-░-░-░ &6&l[&e&lАфк-Лобби&6&l] &a&l${playerName} &bпрошёл мини-паркур за &e${timeTaken.toFixed(2)} &bсекунд и получил &e$&a20`);
+
+          let playerLog = parkourLog.find(log => log.username === playerName);
+          if (!playerLog) {
+            playerLog = { username: playerName, completions: 0, bestTime: Infinity, runes: 0 };
+            parkourLog.push(playerLog);
+          }
+          playerLog.completions++;
+          playerLog.runes += 150; // Добавляем руны за прохождение
+          if (timeTaken < playerLog.bestTime) {
+            playerLog.bestTime = timeTaken;
+          }
+          saveParkourLog(parkourLog);
+
+          // Сброс прогресса после завершения паркура
+          playerProgress[playerName].currentPoint = 0;
+          playerProgress[playerName].startTime = null;
+          console.log(`Progress reset after completion for ${playerName}`);
+
+          // Отправка сообщения в Telegram
+          telegramBot.sendMessage(chatId, `${playerName} прошёл паркур за ${timeTaken.toFixed(2)} секунд! #паркур`);
+        }
+      } else if (currentPoint !== 0 && currentPoint !== 1 && distanceToStart < 1.5) {
+        // Сброс прогресса, если игрок пересекает стартовую точку
+        playerProgress[playerName] = { currentPoint: 1, startTime: new Date() };
+        console.log(`Progress deleted [start] for ${playerName}`);
+      }
+    }
+  }
+});
+
+// Запись данных вручную
+function handleReturnCommand(username, commandParts) {
+  if (commandParts.length !== 3) {
+    bot.chat(`/m ${username} Неверный формат команды. Используйте: -return <ник> <значение>`);
+    return;
+  }
+
+  const targetUsername = commandParts[1];
+  const value = parseFloat(commandParts[2]);
+
+  if (isNaN(value)) {
+    bot.chat(`/m ${username} Значение должно быть числом.`);
+    return;
+  }
+
+  // Ищем игрока, игнорируя регистр
+  let playerLog = parkourLog.find(log => log.username.toLowerCase() === targetUsername.toLowerCase());
+
+  // Если игрок не найден, создаем новую запись
+  if (!playerLog) {
+    playerLog = { username: targetUsername, completions: 0, bestTime: Infinity, runes: 0 };
+    parkourLog.push(playerLog);
+  }
+
+  // Обновляем данные
+  if (Number.isInteger(value)) {
+    playerLog.completions = value;
+    bot.chat(`/m ${username} Количество прохождений для ${playerLog.username} изменено на ${value}.`);
+  } else {
+    playerLog.bestTime = value;
+    bot.chat(`/m ${username} Лучшее время для ${playerLog.username} изменено на ${value.toFixed(3)} секунд.`);
+  }
+
+  saveParkourLog(parkourLog);
+}
+
+// Функция для удаления цветного форматирования
+function removeColorFormatting(text) {
+  return text.replace(/(&[0-9a-fk-or]|§[0-9a-fk-or])/g, '');
+}
+
+bot.on('chat', (username, message) => {
+  if (username === bot.username) return; // Игнорируем сообщения от самого бота
+
+  // Убираем цветное форматирование из сообщения
+  const cleanMessage = removeColorFormatting(message);
+
+  console.log(`${username} -> ${cleanMessage}`);
+  telegramBot.sendMessage(chatId, `${username} -> ${cleanMessage}`);
+
+  if (username === developerNick) {
+    const commandParts = cleanMessage.toLowerCase().split(' ');
+    const command = commandParts[0];
+    switch (command) {
+      case '-here':
+        bot.chat('Телепортируюсь к Вам, мой господин');
+        bot.chat('/tpa _Morkovka_');
+        break;
+      case '-holo':
+        bot.chat('/holo line stats 8 &2(c) &amillkun &2- Разработчик лобби &a_Morkovka_');
+        break;
+      case '-return':
+        handleReturnCommand(username, commandParts);
+        break;
+      case '-stats':
+        bot.chat('Вывел полную статистику в консоль, хозяин');
+        console.log('Parkour Statistics:');
+        parkourLog.forEach(log => {
+          console.log(`${log.username}: ${log.completions} completions, best time: ${log.bestTime.toFixed(2)} seconds, runes: ${log.runes}`);
+        });
+        break;
+      case '-unban':
+        if (commandParts.length !== 2) {
+          bot.chat(`/m ${username} Неверный формат команды. Используйте: -unban <ник>`);
+          return;
+        }
+        const targetUsername = commandParts[1];
+        if (cheatFlags[targetUsername]) {
+          cheatFlags[targetUsername] = false;
+          bot.chat(`/m ${username} Флаг читов снят с игрока ${targetUsername}.`);
+        } else {
+          bot.chat(`/m ${username} Игрок ${targetUsername} не имеет флага читов.`);
+        }
+        break;
+      case '-bal':
+        if (commandParts.length !== 2) {
+          bot.chat(`/m ${username} Неверный формат команды. Используйте: -bal <ник>`);
+          return;
+        }
+        const targetUsername = commandParts[1];
+        let playerLog = parkourLog.find(log => log.username.toLowerCase() === targetUsername.toLowerCase());
+        if (playerLog) {
+          bot.chat(`/m ${username} Баланс рун игрока ${playerLog.username}: ${playerLog.runes}`);
+        } else {
+          bot.chat(`/m ${username} Игрок ${targetUsername} не найден.`);
+        }
+        break;
+      case '-runa':
+        if (commandParts.length !== 3) {
+          bot.chat(`/m ${username} Неверный формат команды. Используйте: -runa <ник> <количество>`);
+          return;
+        }
+        const runaTargetUsername = commandParts[1];
+        let runaAmount = parseInt(commandParts[2], 10);
+        if (isNaN(runaAmount)) {
+          bot.chat(`/m ${username} Количество должно быть числом.`);
+          return;
+        }
+        let runaPlayerLog = parkourLog.find(log => log.username.toLowerCase() === runaTargetUsername.toLowerCase());
+        if (!runaPlayerLog) {
+          runaPlayerLog = { username: runaTargetUsername, completions: 0, bestTime: Infinity, runes: 0 };
+          parkourLog.push(runaPlayerLog);
+        }
+        runaPlayerLog.runes += runaAmount;
+        bot.chat(`/m ${username} Баланс рун игрока ${runaPlayerLog.username} изменен на ${runaAmount}. Новый баланс: ${runaPlayerLog.runes}`);
+        saveParkourLog(parkourLog);
+        break;
+    }
+  } else if (username === developerNick || username !== developerNick) {
+    const command = cleanMessage.toLowerCase(); // Используем очищенное сообщение
+    switch (command) {
+      case '-?':
+        bot.chat(`/m ${username} Это интерактивное афк-лобби. Тут можно проходить мини-паркур и регистрироваться на ивенты. По мини-паркуру есть топ игроков. Варп - hub`);
+        break;
+    }
+  }
+});
+
+bot.on('error', (err) => {
+  console.error('Error:', err);
+  telegramBot.sendMessage(chatId, `Ошибка: ${err.message}. #ошибки`);
+});
+
+bot.on('end', () => {
+  console.log('Bot has disconnected.');
+  telegramBot.sendMessage(chatId, 'Бот отключился от сервера. #ошибки');
+});
