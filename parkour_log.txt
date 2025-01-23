@@ -1,54 +1,74 @@
-_Morkovka_ 447 15.797 47296 
-XTEP 22 16.1 0 
-DeX_Xth 2 23.808 0 
-realprioritet 2 50.314 0 
-героинщик 88 16.711 0 
-_Solitude_ 33 16.511 0 
-KuKu_T_T_KuKu 17 16.601 0 
-~Ликёр_Любимой~ 10 1000.123 0 
-Axemam 3 26.498 0 
-valesskka 1 55.502 0 
-Oti_Max 3 50.101 0 
-hvip 5 27.601 450 
-fahtes 36 19.254 206 
-spongebobas228 1 286.251 0 
-_REFARA_ 8 19.303 300 
-_FleksFull_ 8 17.255 300 
-Treew 181 16.104 600 
-ArnatHack 1 82.863 0 
-~E_M_I_R_Y~ 2 33.503 0 
-RebenokVtankE 1 148.508 0 
-KurapikaLS 654 15.795 18000 
-Temka_1032 31 16.201 649 
-Dar_Play28 1 98.328 0 
-Melitory 1 40.091 0 
-prosto=ing 148 16.226 25866 
-Clychine 5 21.612 600 
-BaFFinn_ 147 15.733 10050 
-mrAngel25 2 21.998 300 
-Xeronn 64 15.688 9600 
-HentaiSkaban 10 16.196 1500 
-Musyaexe 5 23.299 750 
-MasterML_ 187 15.571 26925 
-FvckingRayzen 1 38.437 150 
-__MaDNeSs__ 77 20.695 7612 
-Evodent 13 15.927 1950 
-Countine 20 15.745 3000 
-Angella06 8 24.911 1200 
-Scalicus 11 23.524 1650 
-poluuunya 4 19.071 600 
-savchick4332 1 43.723 150 
-MrDanchik1001 1 34.601 150 
-Malbbi 2 52.928 300 
-xLoonx 5 16.659 750 
-CblpOCTb_HoCkA 2 21.603 300 
-neprikasayemyye 1 61.002 150 
-Nikita_Brus 14 16.296 2786 
-__Дэн__ 3 21.7 597 
-graph1994 4 18.133 796 
-~unnecessary~ 3 26.154 597 
-apelsinowka 4 26.161 796 
-xKenn 46 15.38 9154 
-Kaban12345 4 19.838 796 
-pedohul 3 39.971 597 
-timi3 91 15.521 18109
+KurapikaLS 654 15.795 18000 0 0 
+_Morkovka_ 488 15.797 62615 125 0 
+prosto=ing 278 16.111 51736 0 0 
+Clarian56 243 15.501 48357 0 0 
+MasterML_ 187 15.571 26925 0 0 
+Treew 181 16.104 600 0 0 
+Koning_Rick 158 15.566 31442 0 0 
+BaFFinn_ 147 15.733 10050 0 0 
+timi3 140 14.899 27860 0 0 
+xKenn 133 15.38 26592 5 0 
+героинщик 88 16.711 0 0 0 
+__MaDNeSs__ 77 20.695 7612 0 0 
+Xeronn 64 15.688 9600 0 0 
+Lucius_Malfoy 63 15.818 12537 0 0 
+fahtes 66 17.026 6526 14 0 
+Temka_1032 34 16.201 1246 0 0 
+яндекскарты 42 15.72 8358 0 0 
+_Solitude_ 33 16.511 0 0 0 
+sleapea 38 15.713 7562 0 0 
+Akatsuki_Kodjo 23 16.427 4577 0 0 
+XTEP 22 16.1 0 0 0 
+Countine 20 15.745 3000 0 0 
+Dewier 18 15.966 3582 0 0 
+KuKu_T_T_KuKu 17 16.601 0 0 0 
+Nikita_Brus 14 16.296 2786 0 0 
+Evodent 13 15.927 1950 0 0 
+Scalicus 11 23.524 1650 0 0 
+XxArmaggonxX 10 16.105 1990 0 0 
+HentaiSkaban 10 16.196 1500 0 0 
+~Ликёр_Любимой~ 10 333.333 0 0 0 
+_Pikachu_game 8 21.848 1667 3 0 
+_FleksFull_ 8 17.255 300 0 0 
+_REFARA_ 8 19.303 300 0 0 
+Angella06 8 24.911 1200 0 0 
+xLoonx 5 16.659 750 0 0 
+Clychine 5 21.612 600 0 0 
+Musyaexe 5 23.299 750 0 0 
+hvip 5 27.601 450 0 0 
+graph1994 4 18.133 796 0 0 
+poluuunya 4 19.071 600 0 0 
+Kaban12345 4 19.838 796 0 0 
+apelsinowka 4 26.161 796 0 0 
+Drill___ 3 16.822 597 0 0 
+__Дэн__ 3 21.7 597 0 0 
+~unnecessary~ 3 26.154 597 0 0 
+Axemam 3 26.498 0 0 0 
+pedohul 3 39.971 597 0 0 
+Oti_Max 3 50.101 0 0 0 
+Ty4e4kaa_ 2 18.66 398 0 0 
+CblpOCTb_HoCkA 2 21.603 300 0 0 
+mrAngel25 2 21.998 300 0 0 
+DeX_Xth 2 23.808 0 0 0 
+qsdbaby 2 29.943 398 0 0 
+~E_M_I_R_Y~ 2 33.503 0 0 0 
+spongebobas228 2 35.493 5199 0 0 
+realprioritet 2 50.314 0 0 0 
+Malbbi 2 52.928 300 0 0 
+Yukk0_CraZy 1 21.698 199 0 0 
+killpack 1 24.515 199 0 0 
+reenaissancee 1 28.601 199 0 0 
+DeD1315 1 29.807 199 0 0 
+leha_snayper 1 31.99 199 0 0 
+MrDanchik1001 1 34.601 150 0 0 
+FvckingRayzen 1 38.437 150 0 0 
+PoIsOnOuS_CoBrA 1 39.817 199 0 0 
+Melitory 1 40.091 0 0 0 
+savchick4332 1 43.723 150 0 0 
+valesskka 1 55.502 0 0 0 
+neprikasayemyye 1 61.002 150 0 0 
+gamer_1230 1 63.748 199 0 0 
+ArnatHack 1 82.863 0 0 0 
+Dar_Play28 1 98.328 0 0 0 
+RebenokVtankE 1 148.508 0 0 0 
+ron_rico1316 1 907.984 199 0 0
