@@ -185,7 +185,7 @@ bot.once('spawn', function () {
       const playerPosition = nearestPlayer.entity.position.offset(0, 1.62, 0);
       bot.lookAt(playerPosition);
     } else {
-      bot.look(90, 0); // На восток
+      bot.look(-116.5, 0); // На восток
     }
   }
 
@@ -259,7 +259,6 @@ bot.once('spawn', function () {
     bot.chat('!&e&l/&6&lw&e&la&6&lr&e&lp &6&la&e&lf&6&lk &f&l- Интерактивное &c&lа&4&lф&c&lк&4&l-&c&lл&4&lо&c&lб&4&lб&c&lи&f&l. &fПройди мини-паркур за лучшее время!');
     telegramBot.sendMessage(chatId, 'Агитационное сообщение отправлено. #агитация');
   }, 45 * 60 * 1000);
-});
 
 bot.on('playerJoined', (player) => {
   console.log(`${player.username} joined the server.`);
@@ -443,10 +442,13 @@ bot.on('chat', (username, message) => {
   // Убираем цветное форматирование из сообщения
   const cleanMessage = removeColorFormatting(message);
 
-  console.log(`${username} -> ${cleanMessage}`);
-  telegramBot.sendMessage(chatId, `${username} -> ${cleanMessage}`);
+  // Нормализуем сообщение, оставляя буквы, цифры и допустимые символы
+  const normalizedMessage = cleanMessage.replace(/[^a-zA-Z0-9а-яА-Я_~-]/g, '');
 
-  const commandParts = cleanMessage.toLowerCase().split(' ');
+  console.log(`${username} -> ${normalizedMessage}`);
+  telegramBot.sendMessage(chatId, `${username} -> ${normalizedMessage}`);
+
+  const commandParts = normalizedMessage.toLowerCase().split(' ');
   const command = commandParts[0];
 
   if (username === developerNick) {
@@ -535,7 +537,7 @@ bot.on('chat', (username, message) => {
   // Обработка команд для всех пользователей
   switch (command) {
     case '-?':
-      bot.chat(`Я - бот интерактивного афк-лобби. По мини-паркуру и по количеству внутриигровых есть топ игроков. Варп - hub`);
+      bot.chat(`Я - бот интерактивного афк-лобби. В телеграм-боте &f&lTeslaHubStatsBot &fесть 5 топов всех игроков. Варп - afk`);
       break;
     case '-пфьу':
     case '-game':
@@ -677,8 +679,8 @@ function startInputPhase() {
     saveParkourLog(parkourLog);
     if (inputSequence.length !== currentCombination.length || !arraysEqual(inputSequence, currentCombination)) {
       const currentRunes = (currentRound - 1) * 31;
-      bot.chat(`&8-░-░-░-░-░-░-░-░-░-░-░-░-░-░-░ &6&l[&e&l/Warp afk&6&l] &a&l${currentPlayer} &bпрошёл &e${currentRound - 1} &bраундов в комбинации и выиграл &eひ&a${currentRunes}`);
-      telegramBot.sendMessage(chatId, `${currentPlayer} сыграл в комбинацию. Раунд - ${currentRound}, Очки - ${score}. #комбинация`);
+      bot.chat(`&8-░-░-░-░-░-░-░-░-░-░-░-░-░-░-░ &6&l[&e&l/Warp afk&6&l] &a&l${currentPlayer} &bзаработал &e${score} &bочков в комбинации и получил &eひ&a${currentRunes}`);
+      telegramBot.sendMessage(chatId, `${currentPlayer} сыграл в комбинацию. Пройдено раундов - ${currentRound - 1}, Очки - ${score}. #комбинация`);
       resetGame();
       bot.chat(`/rg f combination use deny`);
     } else {
@@ -839,8 +841,9 @@ statsTelegramBot.on('message', (msg) => {
           const completionsRank = parkourLog.sort((a, b) => b.completions - a.completions).findIndex(log => log.username === playerLog.username) + 1;
           const maxScoreRank = parkourLog.sort((a, b) => b.maxScore - a.maxScore).findIndex(log => log.username === playerLog.username) + 1;
           const gamesPlayedRank = parkourLog.sort((a, b) => b.gamesPlayed - a.gamesPlayed).findIndex(log => log.username === playerLog.username) + 1;
+          const runesRank = parkourLog.sort((a, b) => b.runes - a.runes).findIndex(log => log.username === playerLog.username) + 1;
 
-          const ranksMessage = `Места в топах:\nПо времени мини-паркура: ${timeRank}\nПо прохождениям мини-паркура: ${completionsRank}\nПо очкам комбинации: ${maxScoreRank}\nПо раундам комбинации: ${gamesPlayedRank}`;
+          const ranksMessage = `Места в топах:\nПо времени мини-паркура: ${timeRank}\nПо прохождениям мини-паркура: ${completionsRank}\nПо очкам комбинации: ${maxScoreRank}\nПо раундам комбинации: ${gamesPlayedRank}\nПо количеству рун: ${runesRank}`;
           statsTelegramBot.sendMessage(chatId, ranksMessage);
         } else {
           statsTelegramBot.sendMessage(chatId, 'Игрок не найден.');
