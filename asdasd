@@ -1,0 +1,1113 @@
+const mineflayer = require('mineflayer');
+const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+const fs = require('fs');
+const path = require('path');
+const TelegramBot = require('node-telegram-bot-api');
+const fetch = require('node-fetch');
+const authorizedUsersFilePath = path.join(__dirname, 'authorized_users.json'); // Файл для хранения авторизованных chatId
+const authorizedUsers = {
+  "millkun": "Masha_i_Medved",
+  "Breadbeeer": "X9Y-Z8W-V7U-T6S",
+};
+
+class APIClient {
+    constructor(baseURL = 'https://millkun.ru/afk/api.php') {
+        this.baseURL = baseURL;
+    }
+
+    async request(endpoint, options = {}) {
+        try {
+            const url = `${this.baseURL}/${endpoint}`;
+            const response = await fetch(url, {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                },
+                body: options.body ? JSON.stringify(options.body) : null
+            });
+
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API request failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getPlayer(username) {
+        return this.request(`get-player?username=${encodeURIComponent(username)}`);
+    }
+
+    async updateParkour(username, completions, bestTime) {
+        return this.request('update-parkour', {
+            method: 'POST',
+            body: { username, completions, best_time: bestTime }
+        });
+    }
+
+    async updateCombination(username, roundsPlayed, maxScore) {
+        return this.request('update-combination', {
+            method: 'POST',
+            body: { username, rounds_played: roundsPlayed, max_score: maxScore }
+        });
+    }
+
+    async updateCoins(username, coinsAmount, operation = 'add') {
+        return this.request('update-coins', {
+            method: 'POST',
+            body: { username, coins_amount: coinsAmount, operation }
+        });
+    }
+
+    async getTopTime(limit = 10) {
+        return this.request(`get-top-time?limit=${limit}`);
+    }
+
+    async getTopScore(limit = 10) {
+        return this.request(`get-top-score?limit=${limit}`);
+    }
+
+    async getStats() {
+        return this.request('get-stats');
+    }
+}
+
+process.env.NODE_EXTRA_CA_CERTS = path.resolve(__dirname, 'dir', 'with', 'certs');
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1';
+
+function loadAuthorizedUsers() {
+  try {
+    if (fs.existsSync(authorizedUsersFilePath)) {
+      const data = fs.readFileSync(authorizedUsersFilePath, 'utf-8');
+      if (data.trim() === '') return {};
+      return JSON.parse(data);
+    }
+    return {};
+  } catch (error) {
+    console.error('Ошибка загрузки authorized_users.json:', error);
+    return {};
+  }
+}
+
+function saveAuthorizedUsers(users) {
+  fs.writeFileSync(authorizedUsersFilePath, JSON.stringify(users, null, 2));
+}
+
+// Инициализация
+if (!fs.existsSync(authorizedUsersFilePath)) {
+  fs.writeFileSync(authorizedUsersFilePath, '{}');
+}
+const userAccess = loadAuthorizedUsers();
+
+// Функция для отправки логов только авторизованным пользователям
+function sendLogMessage(message) {
+  Object.keys(userAccess).forEach(chatId => {
+    telegramBot.sendMessage(chatId, message).catch(err => {
+      console.error(`Ошибка отправки в чат ${chatId}:`, err);
+      if (err.response?.statusCode === 403) {
+        delete userAccess[chatId];
+        saveAuthorizedUsers(userAccess); // Удаляем заблокировавших бота
+      }
+    });
+  });
+}
+
+const bot = mineflayer.createBot({
+  host: 'PLAY.TESLACRAFT.ORG',
+  port: 25565,
+  username: 'Morkovka935',
+  timeout: 240000,
+  version: '1.12.2'
+});
+
+bot.loadPlugin(pathfinder);
+
+const logFilePath = path.join(__dirname, 'parkour_log.txt');
+const votesFilePath = path.join(__dirname, 'votes.txt');
+
+const parkourPoints = [
+  { x: 2110.5, y: 206.5, z: 6843.5 },
+  { x: 2103.5, y: 206.5, z: 6841.5 },
+  { x: 2097.5, y: 208.5, z: 6842.5 },
+  { x: 2094.5, y: 209.5, z: 6843.5 },
+  { x: 2092.5, y: 210.5, z: 6846.5 },
+  { x: 2091.5, y: 210.5, z: 6849.5 },
+  { x: 2092.5, y: 210.5, z: 6853.5 },
+  { x: 2096.5, y: 210.5, z: 6860.5 },
+  { x: 2102.5, y: 193.5, z: 6867.5 },
+  { x: 2109.5, y: 193.5, z: 6870.5 },
+  { x: 2116.5, y: 193.5, z: 6867.5 },
+  { x: 2115.5, y: 193.5, z: 6863.5 },
+  { x: 2116.5, y: 193.5, z: 6860.5 },
+  { x: 2117.5, y: 191.5, z: 6858.5 },
+  { x: 2118.5, y: 191.5, z: 6854.5 },
+  { x: 2117.5, y: 192.5, z: 6851.5 },
+  { x: 2112.5, y: 194.5, z: 6848.5 },
+  { x: 2110.5, y: 195.5, z: 6850.5 },
+  { x: 2109.5, y: 194.5, z: 6858.5 },
+  { x: 2104.5, y: 196.5, z: 6860.5 },
+  { x: 2104.5, y: 196.5, z: 6860.5 }
+];
+
+const playerProgress = {};
+const playersNearBot = new Set();
+const cheatFlags = {};
+const playerLastPosition = {};
+const playerLastTime = {};
+
+function loadParkourLog() {
+  if (fs.existsSync(logFilePath)) {
+    const data = fs.readFileSync(logFilePath, 'utf-8');
+    return data.split(' \n').map(line => line.trim()).filter(line => line).map(line => {
+      const [username, completions, bestTime, runes, gamesPlayed, maxScore] = line.split(' ');
+      return { username, completions: parseInt(completions, 10), bestTime: parseFloat(bestTime), runes: parseInt(runes, 10), gamesPlayed: parseInt(gamesPlayed, 10), maxScore: parseInt(maxScore, 10) };
+    });
+  }
+  return [];
+}
+
+function saveParkourLog(logData) {
+  const data = logData.map(entry => `${entry.username} ${entry.completions} ${entry.bestTime} ${entry.runes} ${entry.gamesPlayed} ${entry.maxScore}`).join(' \n');
+  fs.writeFileSync(logFilePath, data);
+}
+
+let parkourLog = loadParkourLog();
+
+const telegramToken = '7800594114:AAGPWKtAuKQR9YaHkR4ALBPOiIkP6GKRFt4';
+const telegramBot = new TelegramBot(telegramToken, { polling: true });
+const chatId = '945518256';
+
+telegramBot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const username = msg.from.username || msg.from.first_name;
+
+  if (userAccess[chatId]) {
+    telegramBot.sendMessage(chatId, '✅ Вы уже авторизованы!');
+    return;
+  }
+
+  // Запрашиваем пароль
+  telegramBot.sendMessage(chatId, '🔒 Для доступа к логам введите пароль:');
+
+  // Ожидаем ввод пароля
+  telegramBot.once('message', (msg) => {
+    const password = msg.text.trim();
+    let authorizedUser = null;
+
+    // Проверяем пароль
+    for (const [user, pass] of Object.entries(authorizedUsers)) {
+      if (password === pass) {
+        authorizedUser = user;
+        break;
+      }
+    }
+
+    if (authorizedUser) {
+      userAccess[chatId] = true;
+      saveAuthorizedUsers(userAccess); // Сохраняем chatId
+      sendLogMessage(`👋 Пользователь ${authorizedUser} (${username}) авторизовался. #авторизация`);
+      telegramBot.sendMessage(chatId, `✅ Доступ разрешён, ${authorizedUser}! Теперь вы будете получать логи.`);
+    } else {
+      telegramBot.sendMessage(chatId, '❌ Неверный пароль. Доступ запрещён.');
+    }
+  });
+});
+
+const statsTelegramToken = '8062737152:AAFpWnnYewAIkjeJfuEo5dWpXzNToEEAsBY';
+const statsTelegramBot = new TelegramBot(statsTelegramToken, { polling: true });
+
+const ignoredMessages = ['Викторина', 'зашёл на режим', 
+'[Генерал] Morkovka935', 'отошел', 
+'вернулся', //  'Вы поменяли строку', 
+'(Текущие флаги:', 'Флаг use в регионе']; // Список игнорируемых сообщений
+const blacklistedPlayers = ['Morkovka935']; // Чёрный список игроков
+const developers = ['_Morkovka_']; // Список разработчиков
+
+
+bot.once('spawn', function () {
+  console.log('Bot has spawned');
+  const defaultMove = new Movements(bot);
+  bot.pathfinder.setMovements(defaultMove);
+
+  function lookAtNearestPlayer() {
+    const players = bot.players;
+    let nearestPlayer = null;
+    let nearestDistance = Infinity;
+
+    for (const playerName in players) {
+      if (playerName === bot.username) continue;
+      const player = players[playerName];
+      if (player.entity && player.entity.position) {
+        const distance = bot.entity.position.distanceTo(player.entity.position);
+        if (distance < nearestDistance && distance < 10) {
+          nearestDistance = distance;
+          nearestPlayer = player;
+        }
+      }
+    }
+
+    if (nearestPlayer) {
+      const playerPosition = nearestPlayer.entity.position.offset(0, 1.62, 0);
+      bot.lookAt(playerPosition);
+    } else {
+      bot.look(55, 0);
+    }
+  }
+
+  setInterval(lookAtNearestPlayer, 10);
+
+  setTimeout(() => {
+    bot.chat(`/swarp morkovka935bot`);
+  }, 7000);
+});
+
+let teleportMode = true;
+const teleportCoords = { x: 2103.4797927595246, y: 206, z: 6858.496120354559 };
+
+function checkAndTeleport() {
+  if (teleportMode) {
+    const botPosition = bot.entity.position;
+    if (botPosition.x !== teleportCoords.x || botPosition.y !== teleportCoords.y || botPosition.z !== teleportCoords.z) {
+      sendLogMessage(`X: ${botPosition.x} = ${teleportCoords.x}; \nY: ${botPosition.y} = ${teleportCoords.y}; \nZ: ${botPosition.z} = ${teleportCoords.z}; #смещение`);
+      bot.chat(`/swarp morkovka935bot`);
+    }
+  }
+}
+
+setInterval(checkAndTeleport, 1 * 60 * 1000);
+
+async function sendTopPlayersByTime() {
+  try {
+      const result = await APIClient.getTopTime(5);
+      if (result.success) {
+          result.data.forEach((log, index) => {
+              const message = `${index + 2} &f${index + 1}. &c&l${log.username} &f[&4&l${log.completions}&f] - &e${log.best_time.toFixed(2)} &fсекунд`;
+              setTimeout(() => {
+                  bot.chat(`/holo line stats ${message}`);
+              }, index * 1500);
+          });
+          setTimeout(() => {
+              bot.chat('/holo line stats 7 &6Обновление каждые &a5 минут&6, если бот онлайн');
+          }, result.data.length * 1500);
+          sendLogMessage('Топ по времени обновился. #топ');
+      } else {
+          bot.chat('&cПроизошла ошибка при получении топа по времени');
+          console.error('Error getting top time:', result.error);
+      }
+  } catch (error) {
+      console.error('Error in sendTopPlayersByTime:', error);
+      bot.chat('&cПроизошла непредвиденная ошибка при обновлении топа');
+  }
+}
+
+async function sendTopPlayersByMaxScore() {
+  try {
+      const result = await APIClient.getTopScore(5);
+      if (result.success) {
+          result.data.forEach((log, index) => {
+              const message = `${index + 2} &f${index + 1}. &c&l${log.username} &f- &e${log.max_score} &fочков`;
+              setTimeout(() => {
+                  bot.chat(`/holo line runs ${message}`);
+              }, index * 1500);
+          });
+          setTimeout(() => {
+              bot.chat('/holo line runs 7 &6Обновление каждые &a5 минут&6, если бот онлайн');
+          }, result.data.length * 1500);
+          sendLogMessage('Топ по очкам обновился. #топ');
+      } else {
+          bot.chat('&cПроизошла ошибка при получении топа по очкам');
+          console.error('Error getting top score:', result.error);
+      }
+  } catch (error) {
+      console.error('Error in sendTopPlayersByMaxScore:', error);
+      bot.chat('&cПроизошла непредвиденная ошибка при обновлении топа');
+  }
+}
+
+let hasParkourChanges = false;
+let hasCombinationChanges = false;
+let isTimeTop = true;
+
+setInterval(() => {
+  if (isTimeTop) {
+    if (hasParkourChanges) {
+      sendTopPlayersByTime();
+      hasParkourChanges = false;
+    }
+  } else {
+    if (hasCombinationChanges) {
+      sendTopPlayersByMaxScore();
+      hasCombinationChanges = false;
+    }
+  }
+  isTimeTop = !isTimeTop;
+}, 5 * 60 * 1000);
+
+setInterval(() => {
+  bot.chat('!&e&l/&6&lw&e&la&6&lr&e&lp &6&la&e&lf&6&lk &f&l- Интерактивное &c&lа&4&lф&c&lк&4&l-&c&lл&4&lо&c&lб&4&lб&c&lи');
+  sendLogMessage('Агитационное сообщение отправлено. #агитация');
+}, 40 * 60 * 1000);
+
+bot.on('playerJoined', (player) => {
+  console.log(`${player.username} joined the server.`);
+  playerProgress[player.username] = { currentPoint: 0, startTime: null };
+  cheatFlags[player.username] = false;
+  playerLastPosition[player.username] = null;
+  playerLastTime[player.username] = null;
+});
+
+bot.on('entityMoved', async (entity) => {
+  if (entity.type === 'player' && entity.username) {
+    const playerName = entity.username;
+    const playerPos = entity.position;
+    const distanceToBot = bot.entity.position.distanceTo(playerPos);
+
+    // Проверяем, находится ли бот на правильных координатах
+    const botPosition = bot.entity.position;
+    const isBotInPosition = 
+      Math.floor(botPosition.x) === Math.floor(teleportCoords.x) &&
+      Math.floor(botPosition.y) === Math.floor(teleportCoords.y) &&
+      Math.floor(botPosition.z) === Math.floor(teleportCoords.z);
+
+    if (distanceToBot < 100) {
+      if (!playersNearBot.has(playerName)) {
+        playersNearBot.add(playerName);
+        sendLogMessage(`${playerName} зашёл в хаб. #онлайн`);
+
+        // Добавляем проверку координат бота
+        if (isBotInPosition) {
+          const playerLog = parkourLog.find(log => log.username === playerName);
+          if (!playerLog) {
+            const newPlayerLog = { 
+              username: playerName, 
+              completions: 0, 
+              bestTime: undefined, 
+              runes: 0, 
+              gamesPlayed: 0, 
+              maxScore: 0 
+            };
+            parkourLog.push(newPlayerLog);
+            saveParkourLog(parkourLog);
+            
+            //bot.chat(`&c&l${playerName}&f, вижу Вы впервые в нашем &e&lАфк-Лобби&f! Обязательно прочитайте правила на &a&l/warp afkrules&f. Там вся информация о варпе, включая правила и команды бота. После ознакомления Вы можете пользоваться варпом в полной мере.`);
+            sendLogMessage(`${playerName} зашёл к нам впервые. #новички`);
+            setTimeout(() => {
+              updatePlayersHologram();
+            }, 1000);
+          }
+        }
+      }
+    } else {
+      if (playersNearBot.has(playerName)) {
+        playersNearBot.delete(playerName);
+        sendLogMessage(`${playerName} покинул хаб. #онлайн`);
+      }
+    }
+
+    if (playerProgress[playerName]) {
+      const currentPoint = playerProgress[playerName].currentPoint;
+      const currentParkourPoint = parkourPoints[currentPoint];
+
+      const distanceToPoint = playerPos.distanceTo(currentParkourPoint);
+      const distanceToStart = playerPos.distanceTo(parkourPoints[0]);
+      if (distanceToPoint < 1.5) {
+        if (currentPoint === 0 && playerProgress[playerName].startTime === null) {
+          playerProgress[playerName].startTime = new Date();
+        }
+        if (currentPoint === 5 || currentPoint === 9 || currentPoint === 14) {
+          playerLastTime[playerName] = new Date();
+        }
+        if (currentPoint === 6 || currentPoint === 10 || currentPoint === 15) {
+          if (playerLastTime[playerName]) {
+            const timeDiff = (new Date() - playerLastTime[playerName]) / 1000;
+            if (timeDiff > 0) {
+              let speed;
+              let message;
+
+              if (currentPoint === 6) {
+                speed = 3.65 / timeDiff;
+                message = `Player ${playerName} is cheating with speed hack at points 5-6. Speed: ${speed}`;
+                if (speed > 7.61577) {
+                  console.log(message);
+                  sendLogMessage(`${playerName} проходит паркур с ускорением на участке ${currentPoint - 1}-${currentPoint}. Скорость: ${speed}. #скорость`);
+                }
+              } else if (currentPoint === 10) {
+                speed = 8.25 / timeDiff;
+                message = `Player ${playerName} is cheating with speed hack at points 9-10. Speed: ${speed}`;
+                if (speed > 7.61577) {
+                  console.log(message);
+                  sendLogMessage(`${playerName} проходит паркур с ускорением на участке ${currentPoint - 1}-${currentPoint}. Скорость: ${speed}. #скорость`);
+                }
+              } else if (currentPoint === 15) {
+                speed = 4.54 / timeDiff;
+                message = `Player ${playerName} is cheating with speed hack at points 14-15. Speed: ${speed}`;
+                if (speed > 11.5) {
+                  console.log(message);
+                  sendLogMessage(`${playerName} проходит паркур с ускорением на участке ${currentPoint - 1}-${currentPoint}. Скорость: ${speed}. #скорость`);
+                }
+              }
+            } else {
+              console.log("timeDiff is zero or negative, cannot calculate speed.");
+            }
+          } else {
+            console.log(`pastTime is not initialized for point ${currentPoint}`);
+          }
+        }
+
+        playerProgress[playerName].currentPoint++;
+        console.log(`Player ${playerName} at point ${playerProgress[playerName].currentPoint}`);
+
+        if (playerProgress[playerName].currentPoint === parkourPoints.length - 1) {
+          const endTime = new Date();
+          const timeTaken = (endTime - playerProgress[playerName].startTime) / 1000;
+          
+          // Используем API вместо файлов
+          const result = await APIClient.updateParkour(playerName, 1, timeTaken);
+          
+          if (result.success) {
+              bot.chat(`&8-░-░-░-░-░-░-░-░-░-░-░-░-░-░- &6&l[&e&lАфк-Лобби&6&l] &a&l${playerName} &bпрошёл мини-паркур за &e${timeTaken.toFixed(2)} &bсекунд и получил &eひ&a199`);
+              sendLogMessage(`${playerName} прошёл паркур за ${timeTaken.toFixed(2)} секунд. #паркур`);
+              
+              // Обновляем руны через API
+              await APIClient.updateCoins(playerName, 199, 'add');
+          } else {
+              console.error('Failed to update parkour stats:', result.error);
+          }
+          
+          playerProgress[playerName].currentPoint = 0;
+          playerProgress[playerName].startTime = null;
+          console.log(`Progress reset after completion for ${playerName}`);
+          
+          hasParkourChanges = true;
+        }
+      } else if (currentPoint !== 0 && currentPoint !== 1 && distanceToStart < 1.5) {
+        playerProgress[playerName] = { currentPoint: 1, startTime: new Date() };
+        console.log(`Progress deleted [start] for ${playerName}`);
+      }
+    }
+  }
+});
+
+telegramBot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const username = msg.from.username;
+  const messageText = msg.text;
+
+  if (username === 'millkun') { // Разрешаем только вашему Telegram-аккаунту
+    bot.chat(messageText);
+  }
+});
+
+function handleReturnCommand(username, commandParts) {
+  if (commandParts.length !== 3) {
+    bot.chat(`/m ${username} Неверный формат команды. Используйте: -return <ник> <значение>`);
+    return;
+  }
+
+  const targetUsername = commandParts[1];
+  const value = parseFloat(commandParts[2]);
+
+  if (isNaN(value)) {
+    bot.chat(`/m ${username} Значение должно быть числом.`);
+    return;
+  }
+
+  let playerLog = parkourLog.find(log => log.username.toLowerCase() === targetUsername.toLowerCase());
+
+  if (!playerLog) {
+    playerLog = { username: targetUsername, completions: 0, bestTime: 999.999, runes: 0, gamesPlayed: 0, maxScore: 0 };
+    parkourLog.push(playerLog);
+  }
+
+  if (Number.isInteger(value)) {
+    playerLog.completions = value;
+    bot.chat(`Количество прохождений для ${playerLog.username} изменено на ${value}.`);
+  } else {
+    playerLog.bestTime = value;
+    bot.chat(`Лучшее время для ${playerLog.username} изменено на ${value.toFixed(3)} секунд.`);
+  }
+
+  saveParkourLog(parkourLog);
+}
+
+const options = ['[1] - Да', '[2] - Нет'];
+const lineNumbers = [5, 6];
+const TOTAL_STICKS = 50;
+
+function handleVote(username, message) {
+    const args = message.split(' ');
+    if (args.length !== 2 || isNaN(args[1])) {
+        bot.chat('&cИспользуйте команду в формате: -vote <номер варианта>');
+        return;
+    }
+
+    const voteOption = parseInt(args[1], 10);
+    if (voteOption < 1 || voteOption > options.length) {
+        bot.chat(`&cПожалуйста, выберите вариант от 1 до ${options.length}`);
+        return;
+    }
+
+    fs.readFile(votesFilePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error(err);
+            return;
+        }
+
+        const fileLines = data.split('\n').filter(line => line.trim()); // Читаем ВСЕ голоса из файла
+        const allVotes = fileLines.map(line => {
+            const [player, option, ...dateParts] = line.split(' ');
+            return {
+                player,
+                option: parseInt(option, 10),
+                date: dateParts.join(' ')
+            };
+        });
+
+        const existingVoteIndex = allVotes.findIndex(vote => vote.player === username); // Проверяем, голосовал ли уже игрок
+        if (existingVoteIndex >= 0) {
+            bot.chat(`&cВ этом опросе Вы уже отдали свой голос за ${allVotes[existingVoteIndex].option} вариант`);
+            return;
+        }
+
+        const voteDate = new Date().toLocaleDateString(); // Добавляем новый голос
+        const newVoteEntry = `${username} ${voteOption} ${voteDate}\n`;
+
+        fs.appendFile(votesFilePath, newVoteEntry, (err) => {
+            if (err) {
+                console.error(err);
+                return;
+            }
+
+            const updatedVotes = [...allVotes, { player: username, option: voteOption, date: voteDate }]; // Создаем обновленный массив голосов
+            updateHologram(updatedVotes); 
+            
+            console.log('votes:', updatedVotes.length); // Логируем для отладки
+            console.log('file:', fileLines.join('\n') + '\n' + newVoteEntry.trim());
+        });
+    });
+}
+
+function updateHologram(votes) {
+    const voteCounts = {}; // Подсчитываем голоса
+    votes.forEach(vote => {
+        voteCounts[vote.option] = (voteCounts[vote.option] || 0) + 1;
+    });
+
+    const totalVotes = votes.length;
+    
+    const sticks = distributeSticks(voteCounts, totalVotes); // Распределяем палочки
+
+    options.forEach((option, index) => { // Обновляем голограмму
+        const optionNum = index + 1;
+        const count = voteCounts[optionNum] || 0;
+        const percentage = Math.round((count / totalVotes) * 100);
+        const colored = sticks[index];
+        const remaining = TOTAL_STICKS - colored;
+        
+        const message = `/holo line players ${lineNumbers[index]} &4&l${option} - &c${'|'.repeat(colored)}&8${'|'.repeat(remaining)} &4&l- ${count} [${percentage}%]`;
+        bot.chat(message);
+    });
+
+    console.log('distribution votes:', voteCounts); // Логируем распределение
+    console.log('distribution sticks:', sticks);
+}
+
+function distributeSticks(voteCounts, totalVotes) {
+    if (totalVotes === 0) return new Array(options.length).fill(0);
+
+    const exactSticks = options.map((_, index) => { // Вычисляем точное количество палочек для каждого варианта
+        const optionNum = index + 1;
+        return (voteCounts[optionNum] || 0) / totalVotes * TOTAL_STICKS;
+    });
+
+    const sticks = exactSticks.map(Math.floor); // Распределяем целые части
+    let remainingSticks = TOTAL_STICKS - sticks.reduce((sum, s) => sum + s, 0);
+
+    if (remainingSticks > 0) { // Распределяем оставшиеся палочки
+        const fractions = exactSticks.map((exact, index) => ({
+            index,
+            fraction: exact - sticks[index]
+        }));
+
+        fractions.sort((a, b) => b.fraction - a.fraction); // Сортируем по убыванию дробной части
+
+        for (let i = 0; i < remainingSticks; i++) { // Добавляем по одной палочке к вариантам с наибольшей дробной частью
+            sticks[fractions[i].index]++;
+        }
+    }
+
+    return sticks;
+}
+
+async function getStatsTelegramUsers() {
+  const chatIds = loadChatIds();
+  const usernames = [];
+
+  for (const chatId of chatIds) {
+    try {
+      const chat = await statsTelegramBot.getChat(chatId);
+      if (chat.type === 'private') {
+        const user = await statsTelegramBot.getChatMember(chatId, chatId);
+        usernames.push(user.user.username || user.user.first_name);
+      }
+    } catch (error) {
+      console.error(`Failed to get chat info for chatId ${chatId}:`, error);
+    }
+  }
+
+  return usernames;
+}
+
+// sendLogMessage(`Ошибка: ${err.message}. #ошибки`);
+
+const validRanks = [
+  "Рядовой", "Ефрейтор", "Мл. Сержант", "Сержант", "Ст. Сержант",
+  "Прапорщик", "Ст. Прапорщик", "Лейтенант", "Ст. Лейтенант",
+  "Капитан", "Майор", "Подполковник", "Полковник", "Генерал",
+  "Маршал", "Император", "YouTube"
+];
+
+bot.on('message', async (jsonMsg) => {
+  const msg = jsonMsg.toString();
+  if (!/[^\s]/.test(msg)) return;
+  if (ignoredMessages.some(word => msg.includes(word))) {
+    return;
+  }
+  telegramBot.sendMessage(chatId, `${msg}`);
+  const parts = msg.split(' ');
+
+  if (parts.length < 5) return;
+
+  const chatType = parts[0].slice(1, 3);
+
+  const clanOrRank = parts[2].slice(1, -1);
+  let clan;
+  let donate;
+  let username;
+  let message;
+  if (validRanks.includes(clanOrRank)) {
+    clan = undefined;
+    donate = clanOrRank;
+    username = parts[3].split(':')[0];
+    message = parts.slice(4).join(' ');
+  } else {
+    const donateOrClan = parts[3].slice(1, -1);
+    clan = clanOrRank;
+    donate = donateOrClan;
+    username = parts[4].split(':')[0];
+    message = parts.slice(5).join(' ');
+  }
+
+  if (blacklistedPlayers.includes(username)) {
+    return;
+  }
+
+  const commandParts = message.toLowerCase().split(' ');
+  const command = commandParts[0];
+
+  if (developers.includes(username)) {
+    switch (command) {
+      case '-here':
+        bot.chat('Телепортируюсь к Вам, мой господин');
+        bot.chat('/tpa _Morkovka_');
+        break;
+      case '-survival':
+        bot.chat('Перехожу на режим классического выживания, Ваше Морквочество');
+        bot.chat('/Survival');
+        break;
+      case '-holo1':
+        bot.chat('/holo line stats 8 &2(c) &amillkun &2- Разработчик лобби &a_Morkovka_');
+        break;
+      case '-holo2':
+        bot.chat('/holo line runs 8 &2(c) &amillkun &2- Разработчик лобби &a_Morkovka_');
+        break;
+      case '-holo3':
+        bot.chat('/holo line combination 4 &2(c) &amillkun &2- Разработчик лобби &a_Morkovka_');
+        break;
+      case '-holo4':
+        bot.chat('/holo line players 1 &a&l-=-=-=-=-=-=- &e&lМ&6&lе&e&lн&6&lю &a&l-=-=-=-=-=-=-');
+        break;
+      case '-updatevotes':
+        fs.readFile(votesFilePath, 'utf8', (err, data) => {
+            if (err) {
+                console.error(err);
+                bot.chat('&cПроизошла ошибка при чтении файла голосов');
+                return;
+            }
+            const fileLines = data.split('\n').filter(line => line.trim());
+            const allVotes = fileLines.map(line => {
+                const [player, option, ...dateParts] = line.split(' ');
+                return {
+                    player,
+                    option: parseInt(option, 10),
+                    date: dateParts.join(' ')
+                };
+            });
+            updateHologram(allVotes);
+            bot.chat('&2Голограмма с голосованием успешно обновлена');
+        });
+        break;
+      case '-return':
+        if (commandParts.length !== 3) {
+            bot.chat(`/m ${username} Неверный формат команды. Используйте: -return <ник> <значение>`);
+            return;
+        }
+        
+        const targetUsername = commandParts[1];
+        const value = parseFloat(commandParts[2]);
+        
+        if (isNaN(value)) {
+            bot.chat(`/m ${username} Значение должно быть числом.`);
+            return;
+        }
+        
+        try {
+            // Получаем текущие данные игрока
+            const playerResult = await APIClient.getPlayer(targetUsername);
+            if (playerResult.success && playerResult.data) {
+                if (Number.isInteger(value)) {
+                    // Обновляем количество прохождений
+                    await APIClient.updateParkour(targetUsername, value - playerResult.data.parkour_completions, playerResult.data.parkour_best_time);
+                    bot.chat(`Количество прохождений для ${targetUsername} изменено на ${value}.`);
+                } else {
+                    // Обновляем лучшее время
+                    await APIClient.updateParkour(targetUsername, 0, value);
+                    bot.chat(`Лучшее время для ${targetUsername} изменено на ${value.toFixed(3)} секунд.`);
+                }
+            } else {
+                bot.chat(`/m ${username} Игрок ${targetUsername} не найден.`);
+            }
+        } catch (error) {
+            console.error('Error in -return command:', error);
+            bot.chat(`/m ${username} Произошла ошибка при обновлении данных.`);
+        }
+        break;
+      case '-dis':
+        bot.chat('/dis Armor_Stand setNoBasePlate setShowArms setSprinting setLeftArm 297,31,0 setRightArm 299,320,0 setItemInMainHand 391');
+        break;
+      case '-und':
+        bot.chat('/und');
+        break;
+      case '-accept':
+        bot.chat('/rg accept');
+        break;
+      case '-reload':
+        bot.chat('/hub');
+        setTimeout(() => {
+          bot.chat(`/swarp morkovka935bot`);
+        }, 5000);
+        break;
+      case '-stats':
+        bot.chat('Вывел полную статистику в консоль, хозяин');
+        console.log('Parkour Statistics:');
+        const totalPlayers = parkourLog.length;
+        const totalCompletions = parkourLog.reduce((sum, log) => sum + log.completions, 0);
+        const totalRunes = parkourLog.reduce((sum, log) => sum + log.runes, 0);
+        console.log(`Total players: ${totalPlayers}`);
+        console.log(`Total completions: ${totalCompletions}`);
+        console.log(`Total runes: ${totalRunes}`);
+        parkourLog.forEach(log => {
+          console.log(`${log.username}: ${log.completions} completions, best time: ${log.bestTime.toFixed(2)} seconds, runes: ${log.runes}, games played: ${log.gamesPlayed}, max score: ${log.maxScore}`);
+        });
+        break;
+      case '-runa':
+        if (commandParts.length !== 3) {
+            bot.chat(`&4Неверный формат команды. Используйте: -runa <ник> <количество>`);
+            return;
+        }
+        
+        const runaTargetUsername = commandParts[1];
+        let runaAmount = parseInt(commandParts[2], 10);
+        
+        if (isNaN(runaAmount)) {
+            bot.chat(`&4Количество рун должно быть числом`);
+            return;
+        }
+        
+        try {
+            await APIClient.updateCoins(runaTargetUsername, runaAmount, 'add');
+            bot.chat(`Баланс рун игрока &c&l${runaTargetUsername} &fизменен на &e${runaAmount}&4ひ`);
+        } catch (error) {
+            console.error('Error in -runa command:', error);
+            bot.chat('&4Произошла ошибка при обновлении баланса рун');
+        }
+        break;
+      case '-tpon':
+        teleportMode = true;
+        bot.chat('Режим телепортации включен');
+        break;
+      case '-tpoff':
+        teleportMode = false;
+        bot.chat('Режим телепортации выключен');
+        break;
+      case '-update':
+        sendNotificationToAllUsers('Я обновил телеграм-бота, поэтому без перезагрузки некоторые функции могут быть недоступны. Для перезагрузки напишите пожалуйста /Start');
+        break;
+      case '-statstelegram':
+        getStatsTelegramUsers().then(usernames => {
+          const message = `Количество пользователей statsTelegramBot: ${usernames.length}\nСписок имён: ${usernames.join(', ')}`;
+          sendLogMessage(message);
+        }).catch(err => {
+          console.error('Error getting statsTelegram users:', err);
+          sendLogMessage('Произошла ошибка при получении списка пользователей statsTelegramBot.');
+        });
+        break;
+    }
+  }
+
+  switch (command) {
+    case '-?':
+      bot.chat(`Я - бот интерактивного афк-лобби. В телеграм-боте &f&lTeslaHubStatsBot &fесть 5 топов всех игроков. Варп - afk`);
+      sendLogMessage(`Игрок ${username} выполнил команду -?. #команда`);
+      break;
+    case '-ифд':
+    case '-bal':
+      let targetUsername;
+      if (commandParts.length === 1) {
+          targetUsername = username;
+      } else {
+          targetUsername = commandParts[1];
+      }
+      
+      try {
+          const result = await APIClient.getPlayer(targetUsername);
+          if (result.success && result.data) {
+              bot.chat(`Баланс рун игрока &c&l${result.data.player_nick}&f: &e${result.data.coins || 0}&4ひ`);
+          } else {
+              bot.chat(`&4Игрок &c&l${targetUsername} &4не найден`);
+          }
+      } catch (error) {
+          console.error('Error getting player balance:', error);
+          bot.chat('&cПроизошла ошибка при получении баланса');
+      }
+      sendLogMessage(`Игрок ${username} выполнил команду -bal. #команда`);
+      break;
+    case '-tg':
+      bot.chat('5 полных топов со всеми игроками, общую статистику и индивидуальную статистику каждого игрока можно посмотреть в &nтелеграм-боте&r &e&lTeslaHubStatsBot')
+      sendLogMessage(`Игрок ${username} выполнил команду -tg. #команда`);
+      break;
+    case '-топ':
+    case '-top':
+        try {
+            const playerNick = username;
+            const result = await APIClient.getPlayer(playerNick);
+            
+            if (result.success && result.data) {
+                // Получаем топы через API
+                const [timeResult, completionsResult, scoreResult, gamesResult, coinsResult] = await Promise.all([
+                    APIClient.getTopTime(1000),
+                    APIClient.getTopScore(1000),
+                    APIClient.getStats()
+                ]);
+                
+                if (timeResult.success && completionsResult.success && scoreResult.success && gamesResult.success && coinsResult.success) {
+                    // Находим позиции игрока в различных топаx
+                    const timeRank = timeResult.data.findIndex(log => log.username === playerNick) + 1;
+                    const completionsRank = completionsResult.data.findIndex(log => log.username === playerNick) + 1;
+                    const scoreRank = scoreResult.data.findIndex(log => log.username === playerNick) + 1;
+                    
+                    bot.chat(`&bВаши топы: &eмини-паркур по времени - &a&l${timeRank || 'N/A'}&e, мини-паркур по прохождениям - &a&l${completionsRank || 'N/A'}&e, комбинация по очкам - &a&l${scoreRank || 'N/A'}`);
+                }
+            } else {
+                bot.chat(`&cИгрок ${playerNick} не найден в базе игроков.`);
+            }
+        } catch (error) {
+            console.error('Error getting top stats:', error);
+            bot.chat('&cПроизошла ошибка при получении статистики');
+        }
+        sendLogMessage(`Игрок ${username} выполнил команду -top. #команда`);
+        break;
+    case '-cmd':
+      bot.chat(`Доступные команды: -bal - узнать баланс монет, -top - посмотреть свои места в топах, -tg - узнать ник телеграм-бота с полными топами`);
+      sendLogMessage(`Игрок ${username} выполнил команду -cmd. #команда`);
+      break;
+    case '-sun':
+      bot.chat('/sun');
+      sendLogMessage(`Игрок ${username} выполнил команду -sun. #команда`);
+      break;
+    case '-rain':
+      bot.chat('/rain');
+      sendLogMessage(`Игрок ${username} выполнил команду -rain. #команда`);
+      break;
+    case '-мщеу':
+    case '-vote':
+      handleVote(username, message);
+      sendLogMessage(`Игрок ${username} выполнил команду -vote. #команда`);
+      break;
+    case '-предложить':
+    case '-offer':
+      if (commandParts.length < 2) {
+        bot.chat(`&cИспользуйте: -offer <ваше предложение>`);
+        return;
+      }
+      const offerText = message.substring(commandParts[0].length + 1);
+      sendLogMessage(`${username} -> ${offerText}. #предложения`);
+      bot.chat(`&2Сообщение от игрока &c&l${username} &2отправлено разработчику. Спасибо за Вашу активность!`);
+      break;
+  }
+});
+
+let lastRegisteredPlayer = null;
+let totalPlayersCount = 0;
+
+async function updatePlayersHologram() { 
+  try {
+      const statsResult = await APIClient.getStats();
+      if (statsResult.success) {
+          bot.chat(`/holo line players 3 &bВсего игроков: &4&l${statsResult.data.total_players}`);
+          sendLogMessage('Топ по новым игрокам обновился. #топ');
+      }
+  } catch (error) {
+      console.error('Error updating players hologram:', error);
+  }
+}
+
+bot.on('error', (err) => {
+  console.error('Error:', err);
+  sendLogMessage(`Ошибка: ${err.message}. #ошибки`);
+  process.exit(1); 
+});
+
+bot.on('end', () => {
+  console.log('Bot has disconnected.');
+  sendLogMessage('Бот отключился от сервера. #ошибки');
+  process.exit(1); 
+});
+
+function sendTopInParts(chatId, title, players, formatLine) {
+  // Отправляем заголовок
+  statsTelegramBot.sendMessage(chatId, title, { parse_mode: 'Markdown' });
+
+  // Разбиваем игроков на части по 100
+  const chunkSize = 100;
+  for (let i = 0; i < players.length; i += chunkSize) {
+    const chunk = players.slice(i, i + chunkSize);
+    const message = chunk.map((log, index) => formatLine(log, i + index)).join('\n');
+    
+    // Отправляем часть топа с задержкой
+    setTimeout(() => {
+      statsTelegramBot.sendMessage(chatId, message);
+    }, 150 * (i / chunkSize)); // Задержка 150 мс между сообщениями
+  }
+}
+
+statsTelegramBot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  statsTelegramBot.sendMessage(chatId, 'Добро пожаловать! Выберите опцию:', {
+    reply_markup: {
+      keyboard: [
+        ['[Мини-паркур] Топ по времени'],
+        ['[Мини-паркур] Топ по прохождениям'],
+        ['[Комбинация] Топ по очкам'],
+        ['[Комбинация] Топ по раундам'],
+        ['[Афк-Лобби] Топ по рунам'],
+        ['[Афк-Лобби] Общая статистика'],
+        ['[Афк-Лобби] Статистика игрока']
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true
+    }
+  });
+});
+
+const chatIdsFilePath = path.join(__dirname, 'chat_ids.json');
+
+function loadChatIds() {
+  if (fs.existsSync(chatIdsFilePath)) {
+    const data = fs.readFileSync(chatIdsFilePath, 'utf-8');
+    return JSON.parse(data);
+  }
+  return [];
+}
+
+function saveChatIds(chatIds) {
+  const data = JSON.stringify(chatIds, null, 2);
+  fs.writeFileSync(chatIdsFilePath, data);
+}
+
+let chatIds = loadChatIds();
+
+statsTelegramBot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  if (!chatIds.includes(chatId)) {
+    chatIds.push(chatId);
+    saveChatIds(chatIds);
+  }
+  const messageText = msg.text;
+
+  switch (messageText) {
+    case '[Мини-паркур] Топ по времени':
+      const timeResult = await APIClient.getTopTime(1000);
+      if (timeResult.success) {
+          sendTopInParts(chatId, '*Топ игроков по времени (лучшее время прохождения мини-паркура):*', 
+              timeResult.data, (log, index) => `${index + 1}. ${log.username} - ${log.best_time.toFixed(2)} сек`);
+      }
+      break;
+    case '[Мини-паркур] Топ по прохождениям':
+      const topPlayersByCompletions = parkourLog
+        .sort((a, b) => b.completions - a.completions);
+      sendTopInParts(chatId, '*Топ игроков по прохождениям мини-паркура:*', 
+        topPlayersByCompletions, (log, index) => `${index + 1}. ${log.username} - ${log.completions} прохождений`);
+      break;
+    case '[Комбинация] Топ по очкам':
+      const topPlayersByMaxScore = parkourLog
+        .sort((a, b) => b.maxScore - a.maxScore);
+      sendTopInParts(chatId, '*Топ игроков по очкам (максимальное количество очков в комбинации):*', 
+        topPlayersByMaxScore, (log, index) => `${index + 1}. ${log.username} - ${log.maxScore} очков`);
+      break;
+    case '[Комбинация] Топ по раундам':
+      const topPlayersByGamesPlayed = parkourLog
+        .sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+      sendTopInParts(chatId, '*Топ игроков по раундам комбинации:*', 
+        topPlayersByGamesPlayed, (log, index) => `${index + 1}. ${log.username} - ${log.gamesPlayed} раундов`);
+      break;
+    case '[Афк-Лобби] Топ по рунам':
+      const topPlayersByRunes = parkourLog
+        .sort((a, b) => b.runes - a.runes);
+      sendTopInParts(chatId, '*Топ игроков по количеству рун:*', 
+        topPlayersByRunes, (log, index) => `${index + 1}. ${log.username} - ${log.runes} рун`);
+      break;
+    case '[Афк-Лобби] Общая статистика':
+      const totalPlayers = parkourLog.length;
+      const totalCompletions = parkourLog.reduce((sum, log) => sum + log.completions, 0);
+      const totalRunes = parkourLog.reduce((sum, log) => sum + log.runes, 0);
+      const totalGamesPlayed = parkourLog.reduce((sum, log) => sum + log.gamesPlayed, 0);
+      statsTelegramBot.sendMessage(chatId, `*Общая статистика:*\nКоличество игроков: ${totalPlayers}\nСумма всех прохождений: ${totalCompletions}\nСумма всех рун: ${totalRunes}\nСумма всех раундов комбинации: ${totalGamesPlayed}`, { parse_mode: 'Markdown' });
+      break;
+    case '[Афк-Лобби] Статистика игрока':
+      statsTelegramBot.sendMessage(chatId, '*Введите ник игрока:*', { parse_mode: 'Markdown' });
+      statsTelegramBot.once('message', (msg) => {
+        const playerNick = msg.text;
+        let playerLog = parkourLog.find(log => log.username.toLowerCase() === playerNick.toLowerCase());
+        if (playerLog) {
+          const playerStats = `*Статистика игрока ${playerLog.username}:*\nПрохождений паркура: *${playerLog.completions}*\nЛучшее время паркура: *${playerLog.bestTime.toFixed(2)}* секунд\nКоличество рун: *${playerLog.runes}*\nКоличество раундов в комбинацию: *${playerLog.gamesPlayed}*\nЛучшее количество очков в комбинации: *${playerLog.maxScore}*`;
+          statsTelegramBot.sendMessage(chatId, playerStats, { parse_mode: 'Markdown' });
+
+          const timeRank = parkourLog.sort((a, b) => a.bestTime - b.bestTime).findIndex(log => log.username === playerLog.username) + 1;
+          const completionsRank = parkourLog.sort((a, b) => b.completions - a.completions).findIndex(log => log.username === playerLog.username) + 1;
+          const maxScoreRank = parkourLog.sort((a, b) => b.maxScore - a.maxScore).findIndex(log => log.username === playerLog.username) + 1;
+          const gamesPlayedRank = parkourLog.sort((a, b) => b.gamesPlayed - a.gamesPlayed).findIndex(log => log.username === playerLog.username) + 1;
+          const runesRank = parkourLog.sort((a, b) => b.runes - a.runes).findIndex(log => log.username === playerLog.username) + 1;
+
+          const ranksMessage = `*Места в топах:*\nПо времени мини-паркура: *${timeRank}*\nПо прохождениям мини-паркура: *${completionsRank}*\nПо очкам комбинации: *${maxScoreRank}*\nПо раундам комбинации: *${gamesPlayedRank}*\nПо количеству рун: *${runesRank}*`;
+          statsTelegramBot.sendMessage(chatId, ranksMessage, { parse_mode: 'Markdown' });
+        } else {
+          statsTelegramBot.sendMessage(chatId, '*Игрок не найден*', { parse_mode: 'Markdown' });
+        }
+      });
+      break;
+  }
+});
+
+function sendNotificationToAllUsers(message) {
+  const chatIds = loadChatIds();
+  chatIds.forEach(chatId => {
+    statsTelegramBot.sendMessage(chatId, message).catch(error => {
+      console.error(`Failed to send message to chatId ${chatId}:`, error);
+    });
+  });
+}
